@@ -16,13 +16,21 @@
 
     ©WolfTeam ( https://vk.com/wolf___team )
  */
+/*  ChangeLog:
+	v.1.1
+		- Fix Reload
+		- Delete setting.loadSoundFile
+		- Don't break blocks with a weapon
+	v.1
+		- release
+*/
 LIBRARY({
     name: "ShootLib",
-    version: 1,
+    version: 1.1,
     api: "CoreEngine",
 	dependencies: ["SoundAPI"]
 });
-IMPORT("SoundAPI");
+IMPORT("SoundAPI", "Sound");
 
 var ShootLib = {
 	/**
@@ -54,9 +62,6 @@ var ShootLib = {
 	init:function(settings){
 		if(!settings) return false;
 		for(var i in settings){
-			if(i == "loadSoundFile" && !FileTools.isExists(__dir__+"sounds/"+settings[i]))
-				return Logger.LogError("{init} Файл sounds/"+settings[i]+" не существует", "ShootLib");
-			
 			_shootlib.settings[i] = settings[i];
 		}
 	},
@@ -241,7 +246,6 @@ var _shootlib = {
 	settings:{
 		image_button:true,
 		left_handed:false,
-		loadSoundFile:"empty.ogg",
 		fire:{
 			text:{
 				content:"FIRE",
@@ -655,8 +659,8 @@ var GUIMod = {
 			GUI.run(function(){
 				GUIMod.reload.text.setOnClickListener(new android.view.View.OnClickListener() {
 					onClick: function(b) {
-						alert("reload "+gun.id);
-						reloadAmmo(gun);
+						if(!isReloading)
+							reloadAmmo(gun);
 					}
 				});
 			});
@@ -795,8 +799,9 @@ function shotShotgun(gun) {
 		var a = shotEntity(gun, d, {yaw:yaw, pitch:pitch});
 	}
 }
-var gunSound = null;
-var gunReloadSound = null;
+
+var gunSound = new Sound();
+var gunReloadSound = new Sound();
 function shot(gun){	
 	currentShotTicks = getRate(gun.rate);
 
@@ -869,8 +874,6 @@ function reloadVaribles(){
 Callback.addCallback("PostLoaded", function(){
 	_shootlib.createGuns();
 	_shootlib.createAmmos();
-	gunSound = new Sound(_shootlib.settings.loadSoundFile);
-	gunReloadSound = new Sound(_shootlib.settings.loadSoundFile);
 });
 
 var currentScreen = "null", oldItem = {id:0}, oldSlot = 0;
@@ -940,7 +943,6 @@ Callback.addCallback("ChangeCarriedItem", function(n,o){
 	}
 });
 
-
 var bullets = {},
 entitys_hurt = {};
 Callback.addCallback("ProjectileHit", function (p,i,t) {
@@ -967,5 +969,10 @@ Callback.addCallback("EntityHurt", function (a,v) {
 	}	
 });
 
+Callback.addCallback("DestroyBlockStart", function(){
+	if(ShootLib.isGun(Player.getCarriedItem())){
+		Game.prevent();
+	}
+});
 
 EXPORT("ShootLib", ShootLib);
