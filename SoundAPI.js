@@ -16,24 +16,55 @@
 
     ©WolfTeam ( https://vk.com/wolf___team )
  */
+/*ChangeLog:
+	v.2.1
+		- Add method destroy
+		- Add methods isPlaying and isLooping for class Sound
+		- Fix bug when creating an empty Sound Player
+		- Fix formula for dependence of sound volume on distance
+	v.2
+		- Add class MultiSound
+		- Add methods setInEntity and setVolume for class Sound
+	v.1
+		- release
+*/
 LIBRARY({
     name: "SoundAPI",
-    version: 2,
+    version: 2.1,
     shared: true,
     api: "CoreEngine",
 });
 
 var _soundUtils = {
+	maxPlayer:30,
+	
 	sounds:[],
+	target:[],
 	
 	source:{
+		NULL:null,
 		PLAYER:1,
 		BLOCK:2,
 		ENTITY:3,
 	},
 	
+	getFreePlayer:function(){
+		if(this.sounds.length == this.maxPlayer)
+			for(var i in this.target)
+				if(this.target[i]==null)
+					return i;
+		
+		return -1;
+	},
+	
+	getPlayer:function(id){
+		return this.sounds[id];
+	},
+
 	updateVolume:function(){
 		for(var i in this.sounds){
+			if(this.target[i]==this.source.NULL)continue;
+			
 			var s = this.sounds[i];
 			if(s.source==this.source.PLAYER)continue;
 			
@@ -68,13 +99,15 @@ var _soundUtils = {
 			var radVol = 0.9 / (Math.PI);
 			if(angle<0)angle=angle*-1;
 			var distance = Math.sqrt(Math.pow(pb.x, 2)+Math.pow(pb.y, 2)+Math.pow(pb.z, 2))
+			var P20 = 20*Math.log10(distance);
 			var _distance = s.radius - distance;
 				if(_distance < 0) _distance = 0;
 			
-			if(distance < 2)
-				s.media.setVolume((0.1 + (radVol*angle))*s.volume, (1 - (radVol*angle))*s.volume);
+			if(P20 < 0)
+				s.media.setVolume(0,0);
 			else
-				s.media.setVolume((0.1 + (radVol*angle))*s.volume/(s.radius - 2)*_distance, (1 - (radVol*angle))*s.volume/(s.radius - 2)*_distance);
+				s.media.setVolume((0.1 + (radVol*angle))*s.volume - P20, (1 - (radVol*angle))*s.volume - P20);
+				//s.media.setVolume((0.1 + (radVol*angle))*s.volume/(s.radius - 2)*_distance, (1 - (radVol*angle))*s.volume/(s.radius - 2)*_distance);
 			
 		}
 	},
@@ -99,13 +132,22 @@ var _soundUtils = {
 };
 
 var Sound = function(src, vol){
-	this.media = new android.media.MediaPlayer();
 	
-	this.path = __dir__+"sounds/"+src;
-	this.media.setDataSource(this.path);
-	this.media.prepare();
+	if(_soundUtils.getFreePlayer()==-1){
+		this.media = new android.media.MediaPlayer();
+	}else{
+		this._id = _soundUtils.getFreePlayer();
+		this.media = _soundUtils.getPlayer(this._id).media;
+	}
+	
+	if(typeof src == "string"){
+		this.path = __dir__+"sounds/"+src;
+		this.media.setDataSource(this.path);
+		this.media.prepare();
+	}
 	
 	this.source = _soundUtils.source.PLAYER;
+	
 	this.position = {x:0, y:0, z:0};
 	this.entity = Player.get();
 	this.radius = 5;
@@ -123,6 +165,7 @@ var Sound = function(src, vol){
 		this.source = _soundUtils.source.ENTITY;
 		this.entity = ent;
 		this.radius = r;
+		_soundUtils.target[this._id] = this.source;
 	}
 	
 	this.setInBlock = function(vector, y, z, r){
@@ -143,15 +186,17 @@ var Sound = function(src, vol){
 			this.radius = y;
 		}
 		
+		_soundUtils.target[this._id] = this.source;
 	}
 	this.setInPlayer = function(){
 		this.source = _soundUtils.source.PLAYER;
+		_soundUtils.target[this._id] = this.source;
 	}
 	
-	this.setOnCompletion = function(f){
+	this.setOnCompletion = function(f, a){
 		this.media.setOnCompletionListener(new android.media.MediaPlayer.OnCompletionListener(){
 			onCompletion: function(mp){
-				f(mp);
+				f(a, mp);
 			}
 		}); 
 	};
@@ -167,24 +212,48 @@ var Sound = function(src, vol){
 		this.media.setLooping(a)
 	}
 	
+	this.isLooping = function(){
+		return this.media.isLooping()
+	}
+	
+	this.isPlaying = function(){
+		return this.media.isPlaying()
+	}
+	
 	this.play = function(){
+		if(this.source!=null)
 		this.media.start();
 	};
 	
 	this.pause = function(){
+		if(this.source!=null)
 		this.media.pause();
 	};
 	
 	this.reset = function(){
+		if(this.source!=null)
 		this.media.reset(); 
 	};
 	
 	this.stop = function(){
+		if(!this.path || this.source == null) return false;
 		this.media.stop();
 		this.media.prepare(); 
 	};
 	
-	this._id = _soundUtils.sounds.push(this);
+	this.destroy = function(){
+		this.stop();
+		this.reset();
+		_soundUtils.target[this._id] = _soundUtils.source.NULL;
+	}
+	
+	if(_soundUtils.getFreePlayer()==-1){
+		this._id = _soundUtils.sounds.push(this);
+	}else{
+		_soundUtils.sounds[this._id] = this;
+	}
+	_soundUtils.target[this._id] = this.source;
+	//_soundUtils.target[_id]
 }
 
 var MultiSound = function(params){
@@ -247,6 +316,11 @@ var MultiSound = function(params){
 		}
 	};
 	
+	this.destroy = function(){
+		for(var i = 0; i < this.destroy.length; i++){
+			this.destroy[i].play();
+		}
+	}
 	
 }
 
