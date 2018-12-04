@@ -17,21 +17,29 @@
     ©WolfTeam ( https://vk.com/wolf___team )
  */
 /*  ChangeLog:
-	v.1.1
+	v1.2
+		- Add method Entity.shot
+		- Add parameter (int)gun.bullet.entity = Native.EntityType.ARROW
+		- Add callback GunsDefined
+		- Fix GUI fov
+	v1.1
 		- Fix Reload
 		- Delete setting.loadSoundFile
 		- Don't break blocks with a weapon
-	v.1
+	v1
 		- release
 */
 LIBRARY({
     name: "ShootLib",
-    version: 1.1,
+    version: 1.2,
     api: "CoreEngine",
 	dependencies: ["SoundAPI"]
 });
 IMPORT("SoundAPI", "Sound");
 
+/**
+* Объект ShootLib
+*/
 var ShootLib = {
 	/**
 	** Типы стрельбы
@@ -105,6 +113,8 @@ var ShootLib = {
 			return Logger.LogError("{addGun} gun.bullet.speed должен быть числом", "ShootLib");
 		if(typeof gun.bullet.count != "number")
 			return Logger.LogError("{addGun} gun.bullet.count должен быть числом", "ShootLib");
+		if(gun.bullet.entity && typeof gun.bullet.entity != "number")
+			return Logger.LogError("{addGun} gun.bullet.entity должен быть числом", "ShootLib");
 		
 		if(typeof gun.fov == 'number')
 			gun.fov = {level:gun.fov};
@@ -237,6 +247,31 @@ var ShootLib = {
 		return false;
 	}
 };
+
+/**
+* Выстрел мобом
+* @param entity - Сущность, которая должна выстрелить.
+*/
+Entity.shot = function(entity){
+	var gun = ShootLib.getGun(Entity.getCarriedItem(entity));
+	if(gun==false)return;
+	
+	if(gun.shotType == ShootLib.ShotType.NORMAL)
+		shotSingleBullet(gun);
+	else if(gun.shotType == ShootLib.ShotType.MULTIPLE)
+		shotShotgun(gun);
+	
+	
+	var a = Entity.getLookAngle(entity);
+	Entity.setLookAngle(entity, a.yaw, a.pitch+angleInRadian(gun.recoil));
+	
+	var shootSound = new Sound(gun.sounds.shot);
+	shootSound.setInEntity(entity, 10);
+	shootSound.setOnCompletion(function(){
+		shootSound.destroy();
+	});
+	shootSound.play();
+}
 
 /**
 ** WORKING PART OF MODS
@@ -445,8 +480,11 @@ var GUI = {
 	}
 };
 
-var _width = GUI.ctx.getWindowManager().getDefaultDisplay().getWidth(),
-	_height = GUI.ctx.getWindowManager().getDefaultDisplay().getHeight();
+var matrix = new android.util.DisplayMetrics();
+var display = GUI.ctx.getWindowManager().getDefaultDisplay(),
+display.getMetrics(metrix);
+var _width = metrics.widthPixels,
+	_height = metrics.heightPixels;
 
 if(_width >_height){
 	GUI.width = _width;
@@ -595,7 +633,10 @@ var GUIMod = {
 	crosshair:{
 		image:GUI.createImage("crosshair"),
 		popup:null,
+		opened:false,
+		
 		open:function(){
+			GUIMod.crosshair.opened = false;
 			GUI.run(function(){
 				GUIMod.crosshair.image = GUI.createImage("crosshair");
 				
@@ -607,6 +648,7 @@ var GUIMod = {
 			});
 		},
 		openGUI:function(gun){
+			GUIMod.crosshair.opened = true;
 			GUI.run(function(){
 				GUIMod.crosshair.image = GUI.createImage("crosshairGUI", gun.fov.link);
 				GUIMod.crosshair.image.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
@@ -616,14 +658,19 @@ var GUIMod = {
 				GUIMod.crosshair.popup.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
 				GUIMod.crosshair.popup.setContentView(GUIMod.crosshair.image);
 				GUIMod.crosshair.popup.setAnimationStyle(android.R.style.Animation_Translucent);
-				GUIMod.crosshair.popup.setWidth(GUI.width);
-				GUIMod.crosshair.popup.setHeight(GUI.height);
+				GUIMod.crosshair.popup.setWidth(ViewGroup.LayoutParams.MATCH_PARENT);
+				GUIMod.crosshair.popup.setHeight(ViewGroup.LayoutParams.MATCH_PARENT);
 				GUIMod.crosshair.popup.setTouchable(false);
 				GUIMod.crosshair.popup.showAtLocation(GUI.ctx.getWindow().getDecorView(), android.view.Gravity.CENTER | android.view.Gravity.CENTER, 0, 0);
 			});
 		},
 		reload:function(){
-			
+			GUI.run(function(){
+				if(GUIMod.crosshair.opened){
+					GUIMod.crosshair.close();
+					GUIMod.crosshair.open();
+				}				
+			});
 		},
 		close:function(){
 			GUI.run(function(){
@@ -685,13 +732,15 @@ var GUIMod = {
 		this.fire.open();
 		this.aim.open();
 		this.reload.open();
-		this.reloadUI(gun);
+		this.reloadUI(gun, gui);
 	},
-	reloadUI:function(gun){
+	reloadUI:function(gun, gui){
 		this.fire.reload(gun);
 		this.aim.reload(gun);
 		this.reload.reload(gun);
 		this.reload.update(gun);
+		if(gui != true)
+			this.crosshair.reload(gun);
 	},
 	close:function(){
 		this.fire.close();
@@ -763,9 +812,10 @@ function shotEntity(gun, vectorSpawn, vectorSpeed){
         vectorSpeed = vectorSpawn
     }
 	
+	var ent_id = gun.bullet.entity || Native.EntityType.ARROW;
 	
 	var pp = Player.getPosition();
-	var entity = Entity.spawn(pp.x + (vectorSpawn.x * 2), pp.y + (vectorSpawn.y * 2), pp.z + (vectorSpawn.z * 2), Native.EntityType.ARROW);
+	var entity = Entity.spawn(pp.x + (vectorSpawn.x * 2), pp.y + (vectorSpawn.y * 2), pp.z + (vectorSpawn.z * 2), ent_id);
 	Entity.setSkin(entity, "entity/bullet.png");
 	Entity.moveToAngle(entity, vectorSpeed, gun.bullet);
 	
@@ -874,6 +924,7 @@ function reloadVaribles(){
 Callback.addCallback("PostLoaded", function(){
 	_shootlib.createGuns();
 	_shootlib.createAmmos();
+	Callback.invokeCallback("GunsDefined");
 });
 
 var currentScreen = "null", oldItem = {id:0}, oldSlot = 0;
@@ -976,3 +1027,4 @@ Callback.addCallback("DestroyBlockStart", function(){
 });
 
 EXPORT("ShootLib", ShootLib);
+EXPORT("Entity", Entity);
