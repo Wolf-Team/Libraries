@@ -20,7 +20,7 @@
 	v1.3
 		- Fix interface conflict with multiple mods
 		- Fix errors
-		- Update SoundLib 2.2
+		- Upgrade SoundLib to 2.2
 	v1.2
 		- Add method Entity.shot
 		- Add parameter (int)gun.bullet.entity = Native.EntityType.ARROW
@@ -37,7 +37,7 @@ LIBRARY({
     name: "ShootLib",
     version: 1.3,
     api: "CoreEngine",
-	dependencies: ["SoundAPI:2.2"]
+	dependencies: ["SoundAPI"]
 });
 IMPORT("SoundAPI", "Sound");
 
