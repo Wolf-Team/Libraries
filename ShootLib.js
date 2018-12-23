@@ -17,6 +17,10 @@
     ©WolfTeam ( https://vk.com/wolf___team )
  */
 /*  ChangeLog:
+	v1.3
+		- Fix interface conflict with multiple mods
+		- Fix errors
+		- Update SoundLib 2.2
 	v1.2
 		- Add method Entity.shot
 		- Add parameter (int)gun.bullet.entity = Native.EntityType.ARROW
@@ -31,9 +35,9 @@
 */
 LIBRARY({
     name: "ShootLib",
-    version: 1.2,
+    version: 1.3,
     api: "CoreEngine",
-	dependencies: ["SoundAPI"]
+	dependencies: ["SoundAPI:2.2"]
 });
 IMPORT("SoundAPI", "Sound");
 
@@ -60,7 +64,7 @@ var ShootLib = {
 	},
 	/** Моменьтальное убийство**/
 	MAX_DAMAGE:-1,
-	/** Системная константа, нкжна для инициализации GUI **/
+	/** Системная константа, нужна для инициализации GUI **/
 	GUN_BITMAP:-1,
 	
 	/**
@@ -480,9 +484,9 @@ var GUI = {
 	}
 };
 
-var matrix = new android.util.DisplayMetrics();
-var display = GUI.ctx.getWindowManager().getDefaultDisplay(),
-display.getMetrics(metrix);
+var metrics = new android.util.DisplayMetrics();
+var display = GUI.ctx.getWindowManager().getDefaultDisplay();
+display.getMetrics(metrics);
 var _width = metrics.widthPixels,
 	_height = metrics.heightPixels;
 
@@ -506,7 +510,13 @@ var GUIMod = {
 	fire:{
 		button:GUI.createButton("fire"),
 		popup:null,
+		
+		opened:false,
+		
 		open:function(){
+			if(GUIMod.fire.opened == true) return;
+			GUIMod.fire.opened = true;
+			
 			var a, gravity;
 			if(typeof _shootlib.settings.left_handed == "string")
 				a = __config__.access(_shootlib.settings.left_handed)
@@ -566,6 +576,7 @@ var GUIMod = {
 			}
 		},
 		close:function(){
+			GUIMod.fire.opened = false;
 			GUI.run(function(){
 				if(GUIMod.fire.popup!=null){
 					GUIMod.fire.popup.dismiss();
@@ -577,7 +588,13 @@ var GUIMod = {
 	aim:{
 		button:GUI.createButton("aim"),
 		popup:null,
+		
+		opened:false,
+		
 		open:function(){
+			if(GUIMod.aim.opened == true) return;
+			GUIMod.aim.opened = true;
+			
 			var a, gravity;
 			if(typeof _shootlib.settings.left_handed == "string")
 				a = __config__.access(_shootlib.settings.left_handed)
@@ -622,6 +639,7 @@ var GUIMod = {
 			});
 		},
 		close:function(){
+			GUIMod.aim.opened = false;
 			GUI.run(function(){
 				if(GUIMod.aim.popup!=null){
 					GUIMod.aim.popup.dismiss();
@@ -633,10 +651,14 @@ var GUIMod = {
 	crosshair:{
 		image:GUI.createImage("crosshair"),
 		popup:null,
+		
 		opened:false,
+		opened_gui:false,
 		
 		open:function(){
-			GUIMod.crosshair.opened = false;
+			if(GUIMod.crosshair.opened == true) return;
+			GUIMod.crosshair.opened = true;
+			GUIMod.crosshair.opened_gui = false;
 			GUI.run(function(){
 				GUIMod.crosshair.image = GUI.createImage("crosshair");
 				
@@ -648,7 +670,9 @@ var GUIMod = {
 			});
 		},
 		openGUI:function(gun){
+			if(GUIMod.crosshair.opened == true) return;
 			GUIMod.crosshair.opened = true;
+			GUIMod.crosshair.opened_gui = true;
 			GUI.run(function(){
 				GUIMod.crosshair.image = GUI.createImage("crosshairGUI", gun.fov.link);
 				GUIMod.crosshair.image.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
@@ -674,6 +698,9 @@ var GUIMod = {
 		},
 		close:function(){
 			GUI.run(function(){
+				GUIMod.crosshair.opened = false;
+				GUIMod.crosshair.opened_gui = false;
+				
 				if(GUIMod.crosshair.popup!=null){
 					GUIMod.crosshair.popup.dismiss();
 					GUIMod.crosshair.popup = null;
@@ -684,7 +711,13 @@ var GUIMod = {
 	reload:{
 		text:GUI.createText("reload"),
 		popup:null,
+		
+		opened:false,
+		
 		open:function(){
+			if(GUIMod.reload.opened == true) return;
+			GUIMod.reload.opened = true;
+			
 			GUI.run(function(){
 				GUIMod.reload.text = GUI.createText("reload");
 				
@@ -713,6 +746,7 @@ var GUIMod = {
 			});
 		},
 		close:function(){
+			GUIMod.reload.opened = false;
 			GUI.run(function(){
 				if(GUIMod.reload.popup!=null){
 					GUIMod.reload.popup.dismiss();

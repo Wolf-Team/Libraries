@@ -17,6 +17,9 @@
     ©WolfTeam ( https://vk.com/wolf___team )
  */
 /*ChangeLog:
+	v2.2
+		- Fix a bug due to which the sound did not change its volume regardless of what it is attached to.
+		- The previous volume formula was returned due to the incorrect operation of the previous one.
 	v.2.1
 		- Add method destroy
 		- Add methods isPlaying and isLooping for class Sound
@@ -30,10 +33,11 @@
 */
 LIBRARY({
     name: "SoundAPI",
-    version: 2.1,
+    version: 2.2,
     shared: true,
     api: "CoreEngine",
 });
+
 
 var _soundUtils = {
 	maxPlayer:30,
@@ -99,16 +103,18 @@ var _soundUtils = {
 			var radVol = 0.9 / (Math.PI);
 			if(angle<0)angle=angle*-1;
 			var distance = Math.sqrt(Math.pow(pb.x, 2)+Math.pow(pb.y, 2)+Math.pow(pb.z, 2))
-			var P20 = 20*Math.log10(distance);
+			var P20 = 30 - 20*Math.log10(distance);
 			var _distance = s.radius - distance;
 				if(_distance < 0) _distance = 0;
 			
-			if(P20 < 0)
-				s.media.setVolume(0,0);
-			else
-				s.media.setVolume((0.1 + (radVol*angle))*s.volume - P20, (1 - (radVol*angle))*s.volume - P20);
-				//s.media.setVolume((0.1 + (radVol*angle))*s.volume/(s.radius - 2)*_distance, (1 - (radVol*angle))*s.volume/(s.radius - 2)*_distance);
-			
+			if(distance <= 2)
+				s.media.setVolume((0.1 + (radVol*angle))*s.volume, (1 - (radVol*angle))*s.volume);
+			else{
+				s.media.setVolume(
+					(0.1 + (radVol*angle))*s.volume/(s.radius - 2)*_distance,
+					(1 - (radVol*angle))*s.volume/(s.radius - 2)*_distance
+				);
+			}
 		}
 	},
 	
@@ -120,15 +126,6 @@ var _soundUtils = {
 			s.pause();
 		}
 	},
-	
-	loadedWorld:function(){
-		for(var i in this.sounds){
-			var s = this.sounds[i];
-			if(s.source==this.source.PLAYER)continue;
-			
-			s.play();
-		}
-	}
 };
 
 var Sound = function(src, vol){
@@ -221,6 +218,7 @@ var Sound = function(src, vol){
 	}
 	
 	this.play = function(){
+		alert(this.source);
 		if(this.source!=null)
 		this.media.start();
 	};
@@ -247,11 +245,13 @@ var Sound = function(src, vol){
 		_soundUtils.target[this._id] = _soundUtils.source.NULL;
 	}
 	
-	if(_soundUtils.getFreePlayer()==-1){
-		this._id = _soundUtils.sounds.push(this);
+	this._id = _soundUtils.getFreePlayer();
+	if(this._id == -1){
+		this._id = (_soundUtils.sounds.push(this) - 1);
 	}else{
 		_soundUtils.sounds[this._id] = this;
 	}
+	
 	_soundUtils.target[this._id] = this.source;
 	//_soundUtils.target[_id]
 }
@@ -327,9 +327,7 @@ var MultiSound = function(params){
 Callback.addCallback("tick", function () {
 	_soundUtils.updateVolume();
 });
-Callback.addCallback("LevelLoaded", function () {
-	_soundUtils.loadedWorld();
-});
+
 Callback.addCallback("LevelLeft", function () {
 	_soundUtils.leaveWorld();
 });
