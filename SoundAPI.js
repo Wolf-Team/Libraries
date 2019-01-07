@@ -36,7 +36,7 @@
 */
 LIBRARY({
     name: "SoundAPI",
-    version: 2.2,
+    version: 2.3,
     api: "CoreEngine"
 });
 
