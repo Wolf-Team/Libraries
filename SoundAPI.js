@@ -17,6 +17,9 @@
     ©WolfTeam ( https://vk.com/wolf___team )
  */
 /*ChangeLog:
+	v2.3
+		- Fix shared.
+		- The volume of the player depends on the volume in the game settings.
 	v2.2
 		- Fix a bug due to which the sound did not change its volume regardless of what it is attached to.
 		- The previous volume formula was returned due to the incorrect operation of the previous one.
@@ -34,10 +37,8 @@
 LIBRARY({
     name: "SoundAPI",
     version: 2.2,
-    shared: true,
-    api: "CoreEngine",
+    api: "CoreEngine"
 });
-
 
 var _soundUtils = {
 	maxPlayer:30,
@@ -107,14 +108,15 @@ var _soundUtils = {
 			var _distance = s.radius - distance;
 				if(_distance < 0) _distance = 0;
 			
+			var left_volume, right_volume;
 			if(distance <= 2)
-				s.media.setVolume((0.1 + (radVol*angle))*s.volume, (1 - (radVol*angle))*s.volume);
+				left_volume = (0.1 + (radVol*angle))*s.volume,
+				right_volume = (1 - (radVol*angle))*s.volume;
 			else{
-				s.media.setVolume(
-					(0.1 + (radVol*angle))*s.volume/(s.radius - 2)*_distance,
-					(1 - (radVol*angle))*s.volume/(s.radius - 2)*_distance
-				);
+				left_volume = (0.1 + (radVol*angle))*s.volume/(s.radius - 2)*_distance,
+				right_volume = (1 - (radVol*angle))*s.volume/(s.radius - 2)*_distance;
 			}
+			s.media.setVolume(left_volume * gameVolume, right_volume * gameVolume);
 		}
 	},
 	
@@ -137,7 +139,7 @@ var Sound = function(src, vol){
 		this.media = _soundUtils.getPlayer(this._id).media;
 	}
 	
-	if(typeof src == "string"){
+	if(src && typeof src == "string"){
 		this.path = __dir__+"sounds/"+src;
 		this.media.setDataSource(this.path);
 		this.media.prepare();
@@ -218,7 +220,6 @@ var Sound = function(src, vol){
 	}
 	
 	this.play = function(){
-		alert(this.source);
 		if(this.source!=null)
 		this.media.start();
 	};
@@ -330,6 +331,18 @@ Callback.addCallback("tick", function () {
 
 Callback.addCallback("LevelLeft", function () {
 	_soundUtils.leaveWorld();
+});
+
+/*Volume in the settings*/
+var settings_path = "/storage/emulated/0/games/com.mojang/minecraftpe/options.txt";
+var gameVolume = FileTools.ReadKeyValueFile(settings_path)["audio_sound"];
+var prevScreen = false;
+Callback.addCallback("NativeGuiChanged", function (screen) {
+    var currentScreen = screen.startsWith("screen_world_controls_and_settings") || screen.startsWith("screen_controls_and_settings");
+    if(prevScreen && !currentScreen){
+        gameVolume = FileTools.ReadKeyValueFile(settings_path)["audio_sound"];
+    }
+    prevScreen = currentScreen;
 });
 
 EXPORT("Sound", Sound);
