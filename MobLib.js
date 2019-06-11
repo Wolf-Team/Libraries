@@ -17,32 +17,6 @@
     ©WolfTeam ( https://vk.com/wolf___team )
 */
 
-/*
-//IMPORT
-IMPORT("MobLib");
-
-// EXAMPLE
-var myMob = new Mob({
-	sid:"",//Строковый идентификатор моба !Обязательный параметр
-	name:"",//Название моба, по умолчанию - sid
-	health:20,//Здоровье моба, по умолчанию - 20
-	render:3,//Рендер моба, принимает Render или ID ванильного рендера, по умолчанию - 3
-	hitbox:{//Хитбокс, если указать число, то применется к W и H
-		 w: 1,//Ширина хитбокса, по умолчанию - 1
-         h: 2//Высота хитбокса, по умолчанию - 2
-	},
-	skin:"steve.png",//Текстура моба
-	spawn:0,//Шанс спавна в мире, по умолчанию - 0
-	loot:[],//Лут при убйистве моба
-	ai:28,//AI моба. Число - поведение ванильного моба, по умолчанию - 28
-});
-
-myMob.registerEgg({
-	name:"Название_текстуры",
-	meta:0
-});
-*/
-
 LIBRARY({
     name: "MobLib",
     version: 1,
@@ -169,7 +143,7 @@ var Mob = function(params){
 		
 		Item.createItem(this.getEggID(), "Spawn Egg "+ this.getName(), texture);
 		
-		custom_entity = this;
+		var custom_entity = this;
 		Item.registerUseFunctionForID(ItemID[this.getEggID()], function(coords, item, block) {
 			coords = coords.relative;
 			custom_entity.spawn(coords.x + .5, coords.y, coords.z + .5);
