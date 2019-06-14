@@ -17,6 +17,10 @@
     ©WolfTeam ( https://vk.com/wolf___team )
  */
 /*  ChangeLog:
+	v1.5
+		- Add callback BulletHit
+		- Add callback ShootGun
+		- Add method ShootLib.isBullet
     v1.4
         - Rewritten mod initialization method
         - Using AdvancedEvents
@@ -42,7 +46,7 @@
 */
 LIBRARY({
     name: "ShootLib",
-    version: 1.4,
+    version: 1.5,
     api: "CoreEngine",
     dependencies: ["SoundAPI", "AdvancedEvents"]
 });
@@ -375,7 +379,14 @@ var ShootLib = {
             return true;
         
         return false;
-    }
+    },
+
+	isBullet:function(entity){
+		if(bullets.hasOwnProperty(entity))
+			return true;
+		
+		return false;
+	},
 };
 
 /**
@@ -983,6 +994,7 @@ function shotEntity(gun, vectorSpawn, vectorSpeed){
     Entity.moveToAngle(entity, vectorSpeed, gun.bullet);
     
     bullets[entity] = gun.bullet.damage;
+	Callback.invokeCallback("ShootGun", entity, i, gun);
     return entity;
 }
 
@@ -1157,6 +1169,7 @@ Callback.addCallback("ProjectileHit", function (p,i,t) {
             entitys_hurt[t.entity].push(bullets[p]);
             Entity.remove(p);
         }
+		Callback.invokeCallback("BulletHit", p, i, t);
         delete(bullets[p]);
     }
 });
