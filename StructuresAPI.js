@@ -1,8 +1,36 @@
+/*
+  _____ _                   _                           _     ____  ___ 
+ / ____| |_ _ __ _   _  ___| |_ _   _ _ __  ___  ___   / \   |  _ \|_ _|
+ \___ \| __| '__| | | |/ __| __| | | | '__|/ _ \/ __| / _ \  | |_) || | 
+  ___) | |_| |  | |_| | (__| |_| |_| | |  |  __/\__ \/ ___ \ |  __/ | | 
+ |____/ \__|_|   \__,_|\___|\__|\__,_|_|   \___||___/_/   \_\|_|   |___|
+                                                                                              
+                                                                
+    StructuresAPI
+
+    Внимание! Запрещено:
+    1.Распространение библиотеки на сторонних источниках без указание ссылки на официальное сообщество
+    2.Изменение кода
+    3.Явное копирование кода
+
+    Используя библиотеку вы автоматически соглашаетесь с этими правилами.
+
+    ©WolfTeam ( https://vk.com/wolf___team )
+*/
+/*  Chan1geLog:
+	v1.1
+	- Добавлен метод StructuresAPI.init(string NameFolder) - Задает папку со структурами.
+	- Изменен метод StructuresAPI.set(name, x, y, z, rotate, destroy, progressively, time) - Добавлены параметры (Автор ToxesFoxes https://vk.com/tmm_corporation )
+	 * destroy - Если true, структура будет "уничтожаться"
+	 * progressively - Если true, структура будет постепенно "строиться/уничтожаться"
+	 * time - Время в миллисекундах между установкой/уничтожением блоков
+*/
+
 LIBRARY({
-    name: "StructuresAPI", // по этому имени библиотека будет импортирована
-    version: 1, // код версии должен быть целым числом больше 0, при каждом обновлении библиотеки его надо увеличивать и указывать в документации к ней
-    shared: false, // если true, то библиотека будет глобальной
-    api: "CoreEngine" // название API, которое использует библиотека
+    name: "StructuresAPI",
+    version: 2,
+    shared: false,
+    api: "CoreEngine"
 });
 
 var StructuresAPI = {
@@ -63,8 +91,11 @@ var StructuresAPI = {
 	dir:"structures",
 	structures:{},
 	
-	init:function(params){
+	init:function(dir){
+		if(typeof dir != "string" && !(dir instanceof java.lang.String))
+			throw "dir is not string.";
 		
+		this.dir = dir;
 	},
 	
 	get:function(name){
@@ -131,37 +162,40 @@ var StructuresAPI = {
 		FileTools.WriteText(__dir__ + this.dir + "/" + name + ".struct", JSON.stringify(obj));
 	},
 	
-	set:function(name, x, y, z, rotate){
-		if(rotate === undefined)rotate = StructuresAPI.ROTATE_NONE;
-			
-		if(rotate[0] instanceof Array){
-			if(rotate.indexOf(StructuresAPI.ROTATE_NONE) == -1)
+	set: function (name, x, y, z,rotate, destroy, progressively, time) {
+		if (rotate === undefined) rotate = StructuresAPI.ROTATE_NONE;
+
+		if (rotate[0] instanceof Array) {
+			if (rotate.indexOf(StructuresAPI.ROTATE_NONE) == -1)
 				rotate.push(StructuresAPI.ROTATE_NONE);
-			
-			rotate = rotate[Math.round(rand(0, rotate.length-1))];
+
+			rotate = rotate[Math.round(rand(0, rotate.length - 1))];
 		}
-		
+
 		var arr = this.get(name);
-		
-		if(arr === false)return false;
-		
-		for(var i = 0; i < arr.length; i++){
-			var block = arr[i];
-			var id, data = 0;
-			
-			if(typeof block[3] == "number"){
-				id = block[3];
-			}else{
-				id = block[3].id || 2;
-				data = block[3].data || block[3].meta || 0;
+
+		if (arr === false) return false;
+		new java.lang.Thread(function () {
+			for (var i = 0; i < arr.length; i++) {
+				var block = arr[i];
+				var id, data = 0;
+
+				if (typeof block[3] == "number") {
+					id = block[3];
+				} else {
+					id = block[3].id || 2;
+					data = block[3].data || block[3].meta || 0;
+				}
+
+				var dx = block[0] * rotate[0] + block[1] * rotate[1] + block[2] * rotate[2];
+				var dy = block[0] * rotate[3] + block[1] * rotate[4] + block[2] * rotate[5];
+				var dz = block[0] * rotate[6] + block[1] * rotate[7] + block[2] * rotate[8];
+
+				if (!destroy) World.setBlock(x + dx, y + dy, z + dz, id, data)
+				else World.setBlock(x + dx, y + dy, z + dz, 0, 0)
+				if(progressively)java.lang.Thread.sleep(time || 100);
 			}
-			
-			var dx = block[0] * rotate[0] + block[1] * rotate[1] + block[2] * rotate[2];
-			var dy = block[0] * rotate[3] + block[1] * rotate[4] + block[2] * rotate[5];
-			var dz = block[0] * rotate[6] + block[1] * rotate[7] + block[2] * rotate[8];
-			
-			World.setBlock(x + dx, y + dy, z + dz, id, data) 
-		}
+		}).start();
 	}
 }
 
