@@ -46,7 +46,7 @@
 
 LIBRARY({
     name: "StructuresAPI",
-    version: 4,
+    version: 5,
     shared: false,
     api: "CoreEngine"
 });
@@ -520,7 +520,7 @@ Structure.get = function(name, alerted) {
 	else
 		return new Structure(name, alerted);
 }
-Structure.init = function(folderName){
+Structure.init = function(dir){
 	if(typeof dir != "string" && !(dir instanceof java.lang.String))
 		throw "dir is not string.";
 		
