@@ -17,6 +17,13 @@
     ©WolfTeam ( https://vk.com/wolf___team )
  */
 /*  ChangeLog:
+	v1.6
+		- Fix init configurate
+		- Add method ShootLib.getGunByID
+		- Add method ShootLib.getAmmoByID
+		- Add "bitmap.extra" field for "crosshairGUI" configuration to load sights from item ExtraData field(experimental)
+		- Optimization
+        - In the creative reloading does not require ammo (Only Horizon)
 	v1.5
 		- Add callback BulletHit
 		- Add callback ShootGun
@@ -46,11 +53,18 @@
 */
 LIBRARY({
     name: "ShootLib",
-    version: 1.5,
+    version: 2,
     api: "CoreEngine",
     dependencies: ["SoundAPI", "AdvancedEvents"]
 });
+
+var IS_HORIZON = getCoreAPILevel() > 8;
+
+if(!IS_HORIZON)
+    Game.getGameMode = function(){return 0;};
+
 IMPORT("SoundAPI", "Sound");
+IMPORT("AdvancedEvents");
 
 /**
 * Объект ShootLib
@@ -77,6 +91,7 @@ var ShootLib = {
     MAX_DAMAGE:-1,
     /** Системная константа, нужна для инициализации GUI **/
     GUN_BITMAP:-1,
+	EXTRA_BITMAP:-2,
     
     /**
     * Инициализация и настройка мода
@@ -104,28 +119,14 @@ var ShootLib = {
                     if(!text.size)
                         text.size = 18;
                     
-                    if(!bitmap){
-                        bitmap = {
-                            name:"ui",
-                            coords:{
-                                x:(i=="fire")?544:0,
-                                y:0,
-                                width:544,
-                                height:544
-                            },
-                            size:{
-                                width:90,
-                                height:90
-                            }
-                        };
-                    }
+                    if(!bitmap) bitmap = {};
                     if(!bitmap.name) bitmap.name = "ui";
-                    if(!bitmap.coords) bitmap.coords = {x:(i=="fire")?544:0,y:0,width:544,height:544};
+                    if(!bitmap.coords) bitmap.coords = {};
                         if(!bitmap.coords.x) bitmap.coords.x = (i=="fire")?544:0;
                         if(!bitmap.coords.y) bitmap.coords.y = 0;
                         if(!bitmap.coords.width) bitmap.coords.width = 544;
                         if(!bitmap.coords.height) bitmap.coords.height = 544;
-                    if(!bitmap.size) bitmap.size = {width:90,height:90};
+                    if(!bitmap.size) bitmap.size = {};
                         if(!bitmap.size.width) bitmap.size.width = 90;
                         if(!bitmap.size.height) bitmap.size.height = 90;
                     
@@ -135,28 +136,14 @@ var ShootLib = {
                     var setting = settings[i];
                     var bitmap = setting.bitmap;
                     
-                    if(!bitmap){
-                        bitmap = {
-                            name:"ui",
-                            coords:{
-                                x:1088,
-                                y:0,
-                                width:64,
-                                height:64
-                            },
-                            size:{
-                                width:90,
-                                height:90
-                            }
-                        };
-                    }
+                    if(!bitmap) bitmap = {};
                     if(!bitmap.name) bitmap.name = "ui";
-                    if(!bitmap.coords) bitmap.coords = {x:1088,y:0,width:64,height:64};
+                    if(!bitmap.coords) bitmap.coords = {};
                         if(!bitmap.coords.x) bitmap.coords.x = 1088;
                         if(!bitmap.coords.y) bitmap.coords.y = 0;
                         if(!bitmap.coords.width) bitmap.coords.width = 64;
                         if(!bitmap.coords.height) bitmap.coords.height = 64;
-                    if(!bitmap.size) bitmap.size = {width:90,height:90};
+                    if(!bitmap.size) bitmap.size = {};
                         if(!bitmap.size.width) bitmap.size.width = 90;
                         if(!bitmap.size.height) bitmap.size.height = 90;
                     
@@ -166,27 +153,14 @@ var ShootLib = {
                     var setting = settings[i];
                     var bitmap = setting.bitmap;
                     
-                    if(!bitmap){
-                        bitmap = {
-                            name:ShootLib.GUN_BITMAP,
-                            coords:{
-                                x:0,
-                                y:0,
-                                width:1024,
-                                height:1024
-                            },
-                            size:{
-                                width:_shootlib.settings.crosshairGUI.size
-                            }
-                        };
-                    }
+                    if(!bitmap) bitmap = {}
                     if(!bitmap.name) bitmap.name = ShootLib.GUN_BITMAP;
-                    if(!bitmap.coords) bitmap.coords = {x:0,y:0,width:1024,height:1024};
+                    if(!bitmap.coords) bitmap.coords = {};
                         if(!bitmap.coords.x) bitmap.coords.x = 0;
                         if(!bitmap.coords.y) bitmap.coords.y = 0;
                         if(!bitmap.coords.width) bitmap.coords.width = 1024;
                         if(!bitmap.coords.height) bitmap.coords.height = 1024;
-                    if(!bitmap.size) bitmap.size = {width:_shootlib.settings.crosshairGUI.size};
+                    if(!bitmap.size) bitmap.size = {};
                         if(!bitmap.size.width) bitmap.size.width = _shootlib.settings.crosshairGUI.size;
                     
                     _shootlib.settings[i] = setting;
@@ -195,12 +169,9 @@ var ShootLib = {
                     var setting = settings[i];
                     var text = setting.text;
                     
-                    if(!text)
-                        text = {content:"8/8", size:16}
-                    if(!text.content)
-                        text.content = "8/8";
-                    if(!text.size)
-                        text.size = 16;
+                    if(!text) text = {}
+                    if(!text.content) text.content = "8/8";
+                    if(!text.size) text.size = 16;
                     
                     _shootlib.settings[i] = setting;
                 break;
@@ -387,6 +358,24 @@ var ShootLib = {
 		
 		return false;
 	},
+	
+	getGunByID:function(name){
+		for(var i = 0; i < _shootlib.guns.length; i++){
+			if(_shootlib.guns[i].id == name)
+				return _shootlib.guns[i];
+		}
+		
+		return false;
+	},
+	
+	getAmmoByID:function(name){
+		for(var i = 0; i < _shootlib.ammos.length; i++){
+			if(_shootlib.ammos[i].id == name)
+				return _shootlib.ammos[i];
+		}
+		
+		return false;
+	},
 };
 
 /**
@@ -502,8 +491,8 @@ var _shootlib = {
             var gun = guns[i];
             
             IDRegistry.genItemID(gun.id);
-            Item.createItem(gun.id, gun.name, gun.texture,{isTech:false,stack:1});
-            Item.describeItem(gun.id, {toolRender: true});
+            Item.createItem(gun.id, gun.name, gun.texture, {isTech:false, stack:1});
+            Item.setToolRender(ItemID[gun.id], true);
         }
     },
     
@@ -577,8 +566,8 @@ var GUI = {
     },
     createImage:function(button, bitmapUrl){
         button = _shootlib.settings[button];
-        
-        img = button.bitmap.name == ShootLib.GUN_BITMAP?bitmapUrl:button.bitmap.name;
+		
+		img = [ShootLib.GUN_BITMAP, ShootLib.EXTRA_BITMAP].indexOf(button.bitmap.name) != -1 ? bitmapUrl : button.bitmap.name;
         bitmap_coords = button.bitmap.coords;
         size = button.bitmap.size;
         
@@ -621,6 +610,12 @@ var GUI = {
     }
 };
 
+GUI.run(function(){
+    GUI.ctx.getWindow().setFlags(   android.view.WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                                android.view.WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
+});
+
+
 var metrics = new android.util.DisplayMetrics();
 var display = GUI.ctx.getWindowManager().getDefaultDisplay();
 display.getMetrics(metrics);
@@ -647,7 +642,7 @@ for(var i = 0; i < resources.length; i++){
 
 var GUIMod = {
     fire:{
-        button:GUI.createButton("fire"),
+        button:null,
         popup:null,
         
         opened:false,
@@ -684,6 +679,7 @@ var GUIMod = {
                         onClick: function(b) {
                             if(currentShotTicks <= 0 && !isReloading){
                                 shot(gun);
+								stopShooting();
                             }
                         }
                     });
@@ -698,6 +694,7 @@ var GUIMod = {
                                 if(isShooting){
                                     isShooting = false;
                                     selectGun = null;
+									stopShooting();
                                 }
                             } else {
                                 if (!isShooting) {
@@ -725,7 +722,7 @@ var GUIMod = {
         }
     },
     aim:{
-        button:GUI.createButton("aim"),
+        button:null,
         popup:null,
         
         opened:false,
@@ -761,7 +758,10 @@ var GUIMod = {
                     onClick: function(b) {
                         if(!isAim){
                             Player.setFov(getFovLevel(gun.fov.level));
-                            if(gun.fov.link){
+							var g = Player.getCarriedItem().extra;
+							if(g == null) g = new ItemExtraData();
+							
+							if(gun.fov.link || (_shootlib.settings.crosshairGUI.bitmap.name == ShootLib.EXTRA_BITMAP && g.getString(_shootlib.settings.crosshairGUI.bitmap.extra)) ){
                                 GUIMod.close();
                                 GUIMod.open(gun, true);
                             }
@@ -788,7 +788,7 @@ var GUIMod = {
         }
     },
     crosshair:{
-        image:GUI.createImage("crosshair"),
+        image:null,
         popup:null,
         
         opened:false,
@@ -813,18 +813,28 @@ var GUIMod = {
             GUIMod.crosshair.opened = true;
             GUIMod.crosshair.opened_gui = true;
             GUI.run(function(){
-                GUIMod.crosshair.image = GUI.createImage("crosshairGUI", gun.fov.link);
+				var g = Player.getCarriedItem().extra;
+				if(g == null) g = new ItemExtraData();
+				
+                GUIMod.crosshair.image = GUI.createImage("crosshairGUI", g.getString(_shootlib.settings.crosshairGUI.bitmap.extra, gun.fov.link));
                 GUIMod.crosshair.image.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
-                GUIMod.crosshair.image.setLayoutParams(new android.widget.LinearLayout.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT));
+                GUIMod.crosshair.image.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
+                    GUI.width,
+                    GUI.height));
                 
                 GUIMod.crosshair.popup = new android.widget.PopupWindow();
                 GUIMod.crosshair.popup.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
                 GUIMod.crosshair.popup.setContentView(GUIMod.crosshair.image);
                 GUIMod.crosshair.popup.setAnimationStyle(android.R.style.Animation_Translucent);
-                GUIMod.crosshair.popup.setWidth(android.view.ViewGroup.LayoutParams.MATCH_PARENT);
-                GUIMod.crosshair.popup.setHeight(android.view.ViewGroup.LayoutParams.MATCH_PARENT);
+
+                //GUIMod.crosshair.popup.setWidth(android.view.ViewGroup.LayoutParams.MATCH_PARENT);
+                //GUIMod.crosshair.popup.setHeight(android.view.ViewGroup.LayoutParams.MATCH_PARENT);
+
+                GUIMod.crosshair.popup.setWidth(GUI.width);
+                GUIMod.crosshair.popup.setHeight(GUI.height);
+                
                 GUIMod.crosshair.popup.setTouchable(false);
-                GUIMod.crosshair.popup.showAtLocation(GUI.ctx.getWindow().getDecorView(), android.view.Gravity.CENTER | android.view.Gravity.CENTER, 0, 0);
+                GUIMod.crosshair.popup.showAtLocation( GUI.ctx.getWindow().getDecorView(), android.view.Gravity.CENTER | android.view.Gravity.CENTER, 0, 0);
             });
         },
         reload:function(){
@@ -848,7 +858,7 @@ var GUIMod = {
         }
     },
     reload:{
-        text:GUI.createText("reload"),
+        text:null,
         popup:null,
         
         opened:false,
@@ -869,9 +879,7 @@ var GUIMod = {
         },
         update:function(gun){
             GUI.run(function(){
-                var item = Player.getCarriedItem();
-                var extra = item.extra;
-                GUIMod.reload.text.setText(extra.getInt("bullet")+"/"+gun.bullet.count);
+                GUIMod.reload.text.setText(thisGunBullet+"/"+gun.bullet.count);
             });
         },
         reload:function(gun){
@@ -923,15 +931,23 @@ var GUIMod = {
     }
 };
 
+Callback.addCallback("PostLoaded", function(){
+	GUIMod.fire.button = GUI.createButton("fire");
+	GUIMod.aim.button = GUI.createButton("aim");
+	GUIMod.crosshair.image = GUI.createImage("crosshair");
+	GUIMod.reload.text = GUI.createText("reload");
+});
+
 var gunExtra = new ItemExtraData();
 gunExtra.putInt('bullet', 0);
 
 var ACCURACY = 0.55,
-isAim = false,
-isShooting = false,
-isReloading = false,
-selectGun = null,
-currentShotTicks = 0;
+	isAim = false,
+	isShooting = false,
+	isReloading = false,
+	selectGun = null,
+	currentShotTicks = 0,
+	thisGunBullet = 0;
 
 var _LogError = Logger.LogError;
 Logger.LogError = function(a,b){
@@ -967,7 +983,6 @@ function getItemInInventory(ID,COUNT,DATA) {
     }
     return -1;
 }
-
 
 function getFovLevel(a){
     return 70 - a;
@@ -1027,10 +1042,11 @@ function shotShotgun(gun) {
 
 var gunSound = new Sound();
 var gunReloadSound = new Sound();
+
 function shot(gun){ 
     currentShotTicks = getRate(gun.rate);
 
-    if(Player.getCarriedItem().extra.getInt('bullet')<=0){
+    if(thisGunBullet <= 0){
         gunSound.setSource(gun.sounds.empty);
         gunSound.play();
         return false;
@@ -1052,31 +1068,39 @@ function shot(gun){
     });
     shootSound.play();
     
-    var pi = Player.getCarriedItem();
-    thisGunExtra = pi.extra;
-    thisGunExtra.putInt('bullet', thisGunExtra.getInt('bullet')-1);
-        
-    Player.setCarriedItem(pi.id, pi.count, pi.data, thisGunExtra);
+    thisGunBullet--;
+	
     GUIMod.reload.update(gun);
 }
 
+function stopShooting(){
+	var pi = Player.getCarriedItem();
+    thisGunExtra = pi.extra;
+    thisGunExtra.putInt('bullet', thisGunBullet);
+    
+	Player.setCarriedItem(pi.id, pi.count, pi.data, thisGunExtra);
+}
+
 function reloadAmmo(gun){
-    if(getItemInInventory(ItemID[gun.ammo]) != -1){
+    if(Game.getGameMode() == 1 || getItemInInventory(ItemID[gun.ammo]) != -1){
         isReloading = true;
         gunReloadSound.setSource(gun.sounds.reload);
         gunReloadSound.setOnCompletion(function(){
             isReloading = false;
             
-            var slot_id = getItemInInventory(ItemID[gun.ammo]);
-            var slot = Player.getInventorySlot(slot_id);
-            if((slot.count - 1) > 0)
-                Player.setInventorySlot(slot_id, slot.id, slot.count-1, slot.data);
-            else
-                Player.setInventorySlot(slot_id, 0, 0, 0);
-            
+            if(Game.getGameMode() == 0){
+                var slot_id = getItemInInventory(ItemID[gun.ammo]);
+                var slot = Player.getInventorySlot(slot_id);
+                if((slot.count - 1) > 0)
+                    Player.setInventorySlot(slot_id, slot.id, slot.count-1, slot.data);
+                else
+                    Player.setInventorySlot(slot_id, 0, 0, 0);
+            }
+
             var a = Player.getCarriedItem();
             a.extra.putInt("bullet", gun.bullet.count);
             Player.setCarriedItem(a.id, a.count, a.data, a.extra);
+			thisGunBullet = gun.bullet.count;
             
             GUIMod.reload.update(gun);
         });
@@ -1094,11 +1118,12 @@ function reloadVaribles(){
     isReloading = false;
     isShooting = false;
     currentShotTicks = 0;
+	thisGunBullet = 0;
 }
 
 Callback.addCallback("PostLoaded", function(){
-    _shootlib.createGuns();
     _shootlib.createAmmos();
+    _shootlib.createGuns();
     Callback.invokeCallback("GunsDefined");
 });
 
@@ -1123,14 +1148,9 @@ Callback.addCallback("tick", function(){
     }
 	
     if (isShooting) {
-        
-        new java.lang.Runnable({
-            run: function() {
-                if(currentShotTicks <= 0){
-                    shot(selectGun);
-                }
-            }
-        }).run();
+        if(currentShotTicks <= 0){
+			shot(selectGun);
+		}
     }
     
     if (currentShotTicks > 0) {
@@ -1143,8 +1163,10 @@ Callback.addCallback("ChangeCarriedItem", function(n,o){
     
     if(ShootLib.isGun(n)){
         if(n.extra==null){
-            Player.setCarriedItem(n.id, n.count, n.data, gunExtra);
+			n.extra = new ItemExtraData(gunExtra);
+            Player.setCarriedItem(n.id, n.count, n.data, n.extra);
         }
+		thisGunBullet = n.extra.getInt('bullet');
     }
     
     
