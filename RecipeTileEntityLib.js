@@ -6,7 +6,7 @@
  |_| \_\\___| \___|_| .__/ \___| |_| |_|_|\___||_____|_| |_|\__|_|\__|\__, |_____|_|_.__/ 
                     |_|                                               |___/                     
                                                                 
-    RecipeTileEntityLib v2.0
+    RecipeTileEntityLib v2.1
 
     Внимание! Запрещено:
     1.Распространение библиотеки на сторонних источниках без указание ссылки на официальное сообщество
@@ -16,14 +16,20 @@
     Используя библиотеку вы автоматически соглашаетесь с этими правилами.
 
     ©WolfTeam ( https://vk.com/wolf___team )
- */
+*/
 /*ChangeLog:
+    v.2.1
+        - Fix errors
+        - Shared
+        - Integration with RecipeViewer
+        - Fix recipe with mod's items
+        - The setWorkbench method was added to the tileentity of the workbench
     v.2.0
         - The library has been rewritten
         - Added the ability to create shapeless recipes
-	v.1.2
-		- Fix change of craft with the same ingredients
-		- Removed method registerTimerGridCraftTable
+    v.1.2
+        - Fix change of craft with the same ingredients
+        - Removed method registerTimerGridCraftTable
         - Removed method registerTimerCraftTable
         - Removed method getTickResipes
     v.1.1
@@ -35,14 +41,16 @@
     v.1
         - release
 */
+
 LIBRARY({
     name: "RecipeTileEntityLib",
-    version: 20,
-    api: "CoreEngine"
+    version: 21,
+    api: "CoreEngine",
+    shared:true
 });
 
 var RecipeTE = {
-	AIR_ITEM:{id:0},
+    AIR_ITEM:{id:0, count:1, data:0},
 
     addWorckbench:function(sid, Prototype){
         RecipeTEDev.mechanisms[sid] = {
@@ -50,6 +58,7 @@ var RecipeTE = {
             cols:       Prototype.Columns || Prototype.columns || Prototype.Cols || Prototype.cols || Prototype.Slots || Prototype.slots,
             rows:       Prototype.Rows || Prototype.rows || 1,
             gui:        Prototype.GuiScreen,
+            rv_gui:     Prototype.RVGuiScreen || null,
             input:      Prototype.Input || Prototype.input || "inputSlot",
             output:     Prototype.Output || Prototype.output || "outputSlot",
             scale:      Prototype.scale || Prototype.scale || "progressScale",
@@ -60,38 +69,49 @@ var RecipeTE = {
         RecipeTEDev.recipes[sid] = [];
     },
 
-	registerWorkbench:function(sid, Prototype){
-		if(!sid || typeof(sid) != "string")
-			throw "Укажите строковый ID блока.";
+    registerWorkbench:function(sid, Prototype){
+        if(!sid || typeof(sid) != "string")
+            throw "Укажите строковый ID блока.";
 
-		if(this.isRegistered(sid))
-			throw "Верстак \"" + sid + "\" уже зарегистрирован.";
+        if(this.isRegistered(sid))
+            throw "Верстак \"" + sid + "\" уже зарегистрирован.";
 
-		this.addWorckbench(sid, Prototype);
+        this.addWorckbench(sid, Prototype);
         
         Prototype._Condition = Prototype.condition || function(){return true;};
-		
-		Prototype._tick = Prototype.tick || function(){};
+        
+        Prototype._tick = Prototype.tick || function(){};
 
-		Prototype._workbench_info = RecipeTEDev.mechanisms[sid];
+        //Prototype._workbench_info = RecipeTEDev.mechanisms[sid];
 
-		Prototype._workbench_info.gui.getWindow("main").getContentProvider().content.elements[Prototype._workbench_info.output].isValid = RecipeTEDev.outputSlotValid;
+        //Prototype._workbench_info.gui.getWindow("main").getContentProvider().content.elements[Prototype._workbench_info.output].isValid = RecipeTEDev.outputSlotValid;
 
-		Prototype.getGuiScreen = function(){
-			return this._workbench_info.gui;
-		}
+        Prototype.getGuiScreen = function(){
+            return this._workbench_info.gui;
+        }
 
-		if(Prototype._workbench_info.time == 0)
-			Prototype.tick = RecipeTEDev.WorkbenchTick;
-		else
-			Prototype.tick = RecipeTEDev.FurnaceTick;
+        Prototype.setWorkbench = function(sid){
+            if(!RecipeTE.isRegistered(sid))
+                throw "Верстак \"" + sid + "\" не зарегистрирован.";
 
-		TileEntity.registerPrototype(BlockID[sid], Prototype);
-	},
+            this._workbench_info = RecipeTEDev.mechanisms[sid];
 
-	isRegistered:function(sid){
-		return RecipeTEDev.mechanisms.hasOwnProperty(sid);
-	},
+            this._workbench_info.gui.getWindow("main").getContentProvider().content.elements[Prototype._workbench_info.output].isValid = RecipeTEDev.outputSlotValid;
+        }
+
+        Prototype.setWorkbench(sid);
+
+        if(Prototype._workbench_info.time == 0)
+            Prototype.tick = RecipeTEDev.WorkbenchTick;
+        else
+            Prototype.tick = RecipeTEDev.FurnaceTick;
+
+        TileEntity.registerPrototype(BlockID[sid], Prototype);
+    },
+
+    isRegistered:function(sid){
+        return RecipeTEDev.mechanisms.hasOwnProperty(sid);
+    },
 
     addRecipe:function(sid, result, ingridients,  time_multiple, craft){
         
@@ -99,6 +119,23 @@ var RecipeTE = {
         let _ing = {};
         let c = 0;
         for(let i in ingridients){
+            if(["string", "number"].indexOf(typeof(ingridients[i])) != -1){
+                ingridients[i] = {
+                    id:ingridients[i],
+                    count: 1
+                };
+            }
+            if(typeof ingridients[i].id == 'string'){
+                if(ItemID[ingridients[i].id])
+                    ingridients[i].id = ItemID[ingridients[i].id];
+                else if(BlockID[ingridients[i].id])
+                    ingridients[i].id = BlockID[ingridients[i].id]
+                else
+                    throw "Не найден предмет "+ingridients[i].id;
+            }
+            if(ingridients[i].id === undefined)
+                throw "Не верный ингридиент.";
+
             if(ingridients[i].id == 0)
                 continue;
 
@@ -129,6 +166,10 @@ var RecipeTE = {
                 result.id = BlockID[result.id]
             else
                 throw "Не найден предмет "+result.id;
+        } else if(result == undefined){
+            return "Результат не задан.";
+        } else if(result.id == undefined){
+            return "ID результата не задан.";
         }
         
         result.count = result.count || 1;
@@ -150,35 +191,59 @@ var RecipeTE = {
         });
     },
 
-	addShapeRecipe:function(sid, result, recipe, ingridients, time_multiple, craft){
-		if(!this.isRegistered(sid))
-			throw "Верстак \"" + sid + "\" не зарегистрирован.";
+    addShapeRecipe:function(sid, result, recipe, ingridients, time_multiple, craft){
+        if(!this.isRegistered(sid))
+            throw "Верстак \"" + sid + "\" не зарегистрирован.";
 
-		let workbench = RecipeTEDev.mechanisms[sid];
-		let type = "grid";
-		if(typeof(recipe) == "string"){
-			type = "line";
-			if(recipe.length > workbench.cols * workbench.rows)
-				throw "Количество ингридиентов в рецепте не должны превешать, количество ячеек верстака.";
-		}else{
-			if(!recipe instanceof Array)
-	            throw "Рецепт должен быть массивом.";
-	        
-	        if(recipe.length > workbench.rows)
-	            throw "Количество строк в рецепте не должны превешать, количество строк сетки верстака.";
+        let workbench = RecipeTEDev.mechanisms[sid];
+        let type = "grid";
+        if(typeof(recipe) == "string"){
+            type = "line";
+            if(recipe.length > workbench.cols * workbench.rows)
+                throw "Количество ингридиентов в рецепте не должны превешать, количество ячеек верстака.";
+        }else{
+            if(!recipe instanceof Array)
+                throw "Рецепт должен быть массивом.";
+            
+            if(recipe.length > workbench.rows)
+                throw "Количество строк в рецепте не должны превешать, количество строк сетки верстака.";
 
-	        for(var i = 1; i < recipe.length; i++){
-	            if(recipe[0].length != recipe[i].length)
-	                throw "Строки должны быть одной длинны";
-	            
-	            if(recipe[i].length > workbench.cols){
-	                throw "Строка не должны быть больше, чем количество столбцов сетки верстака.";
-	            }
-	        }
-		}
+            for(var i = 1; i < recipe.length; i++){
+                if(recipe[0].length != recipe[i].length)
+                    throw "Строки должны быть одной длинны";
+                
+                if(recipe[i].length > workbench.cols){
+                    throw "Строка не должны быть больше, чем количество столбцов сетки верстака.";
+                }
+            }
+        }
 
-		//Стандартные значения результата
-		if(typeof(result) == "string" || typeof(result) == "number"){
+        //
+        for(let i in ingridients){
+            if(["string", "number"].indexOf(typeof(ingridients[i])) != -1){
+                ingridients[i] = {
+                    id:ingridients[i],
+                    count: 1
+                };
+            }
+            if(typeof ingridients[i].id == 'string'){
+                if(ItemID[ingridients[i].id])
+                    ingridients[i].id = ItemID[ingridients[i].id];
+                else if(BlockID[ingridients[i].id])
+                    ingridients[i].id = BlockID[ingridients[i].id]
+                else
+                    throw "Не найден предмет "+ingridients[i].id;
+            }
+            
+            if(ingridients[i].id === undefined)
+                throw "Не верный ингридиент.";
+
+            if(!ingridients[i].count)
+                ingridients[i].count = 1;
+        }
+
+        //Стандартные значения результата
+        if(typeof(result) == "string" || typeof(result) == "number"){
             result = {
                 id:result,
                 count:1,
@@ -193,28 +258,32 @@ var RecipeTE = {
                 result.id = BlockID[result.id]
             else
                 throw "Не найден предмет "+result.id;
+        } else if(result === undefined){
+            return "Результат не задан.";
+        } else if(result.id === undefined){
+            return "ID результата не задан.";
         }
         
         result.count = result.count || 1;
         result.data = result.data || 0;
 
         //time_multiple используется как craft
-		if(typeof time_multiple == "function"){
+        if(typeof time_multiple == "function"){
             craft = time_multiple;
             time_multiple = 1;
         }
 
-		RecipeTEDev.recipes[sid].push({
-			recipe:recipe,
+        RecipeTEDev.recipes[sid].push({
+            recipe:recipe,
             ingridients:ingridients,
             result:result,
             time:time_multiple || 1,
             craft:craft || RecipeTE.defaultCraftEvent,
             type:type
-		});
-	},
+        });
+    },
 
-	getRecipes:function(sid){
+    getRecipes:function(sid){
         if(!this.isRegistered(sid))
             throw "Верстак \"" + sid + "\" не зарегистрирован.";
         
@@ -241,128 +310,128 @@ var RecipeTE = {
 }
 
 var RecipeTEDev = {
-	mechanisms:{},
-	recipes:{},
+    mechanisms:{},
+    recipes:{},
 
     isOpen:function(TE){
         return TE.container.isOpened();
     },
 
-	getChangeWorkbenchInputs:function(TE){
-		let changed = false;
-		for(let i = 0; i < TE._workbench_info.rows; i++){
-				for(let ii = 0; ii < TE._workbench_info.cols; ii++){
-					let input_slot_name;
-					if(typeof TE._workbench_info.input == 'string')
-						input_slot_name = TE._workbench_info.input+ (i * TE._workbench_info.cols + ii);
-					else
-						input_slot_name = TE._workbench_info.input[i * TE._workbench_info.cols + ii];
-						
+    getChangeWorkbenchInputs:function(TE){
+        let changed = false;
+        for(let i = 0; i < TE._workbench_info.rows; i++){
+                for(let ii = 0; ii < TE._workbench_info.cols; ii++){
+                    let input_slot_name;
+                    if(typeof TE._workbench_info.input == 'string')
+                        input_slot_name = TE._workbench_info.input+ (i * TE._workbench_info.cols + ii);
+                    else
+                        input_slot_name = TE._workbench_info.input[i * TE._workbench_info.cols + ii];
+                        
 
-					let slot = TE.container.getSlot(input_slot_name);
-					
-					if(!TE._workbench_info.data_input[input_slot_name])
-						TE._workbench_info.data_input[input_slot_name] = {id:0, data:0, count:0};
-					
-					if(	TE._workbench_info.data_input[input_slot_name].id 	 != slot.id    ||
-						TE._workbench_info.data_input[input_slot_name].data  != slot.data  ||
-						TE._workbench_info.data_input[input_slot_name].count != slot.count ){
-						changed = true;
-					}
-					
-					TE._workbench_info.data_input[input_slot_name] = {
-						id:slot.id,
-						data:slot.data,
-						count:slot.count
-					};
-					
-				}
-			}
+                    let slot = TE.container.getSlot(input_slot_name);
+                    
+                    if(!TE._workbench_info.data_input[input_slot_name])
+                        TE._workbench_info.data_input[input_slot_name] = {id:0, data:0, count:0};
+                    
+                    if( TE._workbench_info.data_input[input_slot_name].id    != slot.id    ||
+                        TE._workbench_info.data_input[input_slot_name].data  != slot.data  ||
+                        TE._workbench_info.data_input[input_slot_name].count != slot.count ){
+                        changed = true;
+                    }
+                    
+                    TE._workbench_info.data_input[input_slot_name] = {
+                        id:slot.id,
+                        data:slot.data,
+                        count:slot.count
+                    };
+                    
+                }
+            }
 
-		return changed;
-	},
+        return changed;
+    },
 
-	WorkbenchTick:function(){
+    WorkbenchTick:function(){
         if(!RecipeTEDev.isOpen(this)) return;
 
-		if(this._Condition()) {
-			let changed = RecipeTEDev.getChangeWorkbenchInputs(this);
+        if(this._Condition()) {
+            let changed = RecipeTEDev.getChangeWorkbenchInputs(this);
             let outputSlot = this.container.getSlot(this._workbench_info.output);
-			if(changed){
-				let resipes = RecipeTE.getRecipes(this._workbench_info.sid),
-					result = false;
+            if(changed){
+                let resipes = RecipeTE.getRecipes(this._workbench_info.sid),
+                    result = false;
 
-				recipe_label: for(var a in resipes){
-					let recipe = resipes[a],
-						input_slot_name,
+                recipe_label: for(var a in resipes){
+                    let recipe = resipes[a],
+                        input_slot_name,
                         input_count,
-						_i, _j,
-						select = false;
+                        _i, _j,
+                        select = false;
 
-					switch(recipe.type){
-						case "grid":
-							for(let i = 0; i < this._workbench_info.rows; i++){
-								for(let j = 0; j < this._workbench_info.cols; j++){
+                    switch(recipe.type){
+                        case "grid":
+                            for(let i = 0; i < this._workbench_info.rows; i++){
+                                for(let j = 0; j < this._workbench_info.cols; j++){
 
-									//Остановка перебора строк, переход к следующему рецепту
-									if(i > this._workbench_info.rows - recipe.recipe.length && !select)
-										continue recipe_label;
+                                    //Остановка перебора строк, переход к следующему рецепту
+                                    if(i > this._workbench_info.rows - recipe.recipe.length && !select)
+                                        continue recipe_label;
 
-									//Остановка перебора ячеек, переход к следующей строке
-									if(j > this._workbench_info.cols - recipe.recipe[0].length && !select)
-										break;
+                                    //Остановка перебора ячеек, переход к следующей строке
+                                    if(j > this._workbench_info.cols - recipe.recipe[0].length && !select)
+                                        break;
 
-									//Получение имени входного слота
-									if(typeof this._workbench_info.input == 'string')
-										input_slot_name = this._workbench_info.input+ (i * this._workbench_info.cols + j);
-									else
-										input_slot_name = this._workbench_info.input[i * this._workbench_info.cols + j];
+                                    //Получение имени входного слота
+                                    if(typeof this._workbench_info.input == 'string')
+                                        input_slot_name = this._workbench_info.input+ (i * this._workbench_info.cols + j);
+                                    else
+                                        input_slot_name = this._workbench_info.input[i * this._workbench_info.cols + j];
 
-									//Получение предмета слота
-									let input = this.container.getSlot(input_slot_name);
+                                    //Получение предмета слота
+                                    let input = this.container.getSlot(input_slot_name);
 
-									if(select){//Проверка рецепта
-										let ing = recipe.recipe[i - _i];
-										if(ing)
-											ing = ing[j - _j];
+                                    if(select){//Проверка рецепта
+                                        let ing = recipe.recipe[i - _i];
+                                        if(ing)
+                                            ing = ing[j - _j];
 
-										if(ing){
-											ing = recipe.ingridients[ing] || RecipeTE.AIR_ITEM;
-										}else{
-											ing = RecipeTE.AIR_ITEM;
-										}
+                                        if(ing){
+                                            ing = recipe.ingridients[ing] || RecipeTE.AIR_ITEM;
+                                        }else{
+                                            ing = RecipeTE.AIR_ITEM;
+                                        }
 
-										if(input.id != ing.id){
-											if(recipe.ingridients[recipe.recipe[0][0]].id == 0){
-												select = false;
-												i = _i;
-												j = _j;
-											} else
-												continue recipe_label;
-										}
-									}else{//Поиск старта рецепта
-										//Получить нужный ингридиент
-										let ing = recipe.ingridients[recipe.recipe[0][0]] || RecipeTE.AIR_ITEM;
-										
-										if(ing.id == input.id){
-											_i = i;
-											_j = j;
-											select = true;
-										}else if(input.id != 0){
-											continue recipe_label;
-										}
-									}
-								}
-							}
-						break;
-						case "line":
-							input_count = this._workbench_info.rows * this._workbench_info.cols;
+                                        if(input.id != ing.id){
+                                            if((recipe.ingridients[recipe.recipe[0][0]]  || RecipeTE.AIR_ITEM).id == 0){
+                                                select = false;
+                                                i = _i;
+                                                j = _j;
+                                            } else
+                                                continue recipe_label;
+                                        }
+                                    }else{//Поиск старта рецепта
+                                        //Получить нужный ингридиент
+                                        let ing = recipe.ingridients[recipe.recipe[0][0]] || RecipeTE.AIR_ITEM;
+                                        
+                                        if(ing.id == input.id){
+                                            _i = i;
+                                            _j = j;
+                                            select = true;
+                                        }else if(input.id != 0){
+                                            continue recipe_label;
+                                        }
+                                    }
+                                }
+                            }
+                        break;
+                        case "line":
+                            input_count = this._workbench_info.rows * this._workbench_info.cols;
 
-							for(var i = 0; i < (input_count); i++){
-                               	if(i > input_count - recipe.recipe.length  && !select)
-                               		continue recipe_label;
+                            for(var i = 0; i < (input_count); i++){
+                                if(i > input_count - recipe.recipe.length  && !select)
+                                    continue recipe_label;
 
-                               	if(typeof this._workbench_info.input == 'string')
+                                if(typeof this._workbench_info.input == 'string')
                                     input_slot_name = this._workbench_info.input+ i;
                                 else
                                     input_slot_name = this._workbench_info.input[i];
@@ -376,15 +445,15 @@ var RecipeTEDev = {
                                     }
                                 }else{
                                     let ing = recipe.ingridients[recipe.recipe[0]] || RecipeTE.AIR_ITEM;
-                                	if(input.id == ing.id){
-	                                	_i = i;
-	                                	select = true;
-	                                }else if(input.id != 0){
+                                    if(input.id == ing.id){
+                                        _i = i;
+                                        select = true;
+                                    }else if(input.id != 0){
                                         continue recipe_label;
                                     }
                                 }
                             }
-						break;
+                        break;
                         case "not_shape":
                             input_count = this._workbench_info.rows * this._workbench_info.cols,
                                 _recipe = {};
@@ -424,20 +493,20 @@ var RecipeTEDev = {
                                     continue recipe_label;
                             }
                         break;
-					}
+                    }
 
 
-					if(select && (outputSlot.id == 0 ||(outputSlot.id == recipe.result.id && outputSlot.data == recipe.result.data))){
-						this.container.setSlot(this._workbench_info.output, recipe.result.id, recipe.result.count, recipe.result.data);
-						this.data._recipe = recipe;
-						result = true;
-						break;
-					}
-				}
+                    if(select && (outputSlot.id == 0 ||(outputSlot.id == recipe.result.id && outputSlot.data == recipe.result.data))){
+                        this.container.setSlot(this._workbench_info.output, recipe.result.id, recipe.result.count, recipe.result.data);
+                        this.data._recipe = recipe;
+                        result = true;
+                        break;
+                    }
+                }
 
-				if(!result)
-					this.container.clearSlot(this._workbench_info.output);
-			}else{
+                if(!result)
+                    this.container.clearSlot(this._workbench_info.output);
+            }else{
                 if((this._workbench_info.data_output.id != outputSlot.id ||
                     this._workbench_info.data_output.data != outputSlot.data ||
                     this._workbench_info.data_output.count != outputSlot.count)){
@@ -464,14 +533,14 @@ var RecipeTEDev = {
                 data:outputSlot.data,
                 count:outputSlot.count
             };
-		}else{
+        }else{
             this.container.clearSlot(this._workbench_info.output);
         }
 
-		this._tick();
-	},
+        this._tick();
+    },
 
-	FurnaceTick:function(){
+    FurnaceTick:function(){
         if(!RecipeTEDev.isOpen(this) && !this.data._active) return;
 
         if(this._Condition()) {
@@ -669,9 +738,187 @@ var RecipeTEDev = {
         }
 
         this._tick();
-	},
+    },
 
-	outputSlotValid:function(){return false;}
+    getOffsetWindow:function(mech){
+        var min = {x:1001, y:1001};
+        var c = mech.gui.getContent();
+
+        for(let id in c.drawing){
+            let el = c.drawing[id];
+            if(!el.RV) continue;
+            if(min.x > el.x) min.x = el.x;
+            if(min.y > el.y) min.y = el.y; 
+        }
+        
+        for(let id in c.elements){
+            let el = c.elements[id];
+            if(!el.RV) continue;
+            if(min.x > el.x) min.x = el.x;
+            if(min.y > el.y) min.y = el.y;
+        }
+
+        for(let i = 0, l = mech.rows * mech.cols; i < l; i++){
+            let el = c.elements[(typeof(mech.input) == "string")? mech.input + i : mech.input[i]];
+            if(min.x > el.x) min.x = el.x;
+            if(min.y > el.y) min.y = el.y;
+        }
+        let el = c.elements[mech.output];
+        if(min.x > el.x) min.x = el.x;
+        if(min.y > el.y) min.y = el.y;
+
+        if(min.x == 1001) min.x = 0;
+        if(min.y == 1001) min.y = 0;
+
+        return min;
+    },
+
+    checkRecipe:function(recipe, item, used){
+        if(!used) used = false;
+        if(!item.data) item.data = 0;
+        if(!used){
+            if(!recipe.result.data) recipe.result.data  = 0;
+            if(recipe.result.id == item.id && (recipe.result.data == item.data || item.data == -1))
+            return true;
+        }else{
+            for(let id in recipe.ingridients){
+                if(!recipe.ingridients[id].data) recipe.ingridients[id].data = -1;
+                if(recipe.ingridients[id].id == item.id && (recipe.ingridients[id].data == item.data || recipe.ingridients[id].data == -1  || item.data == -1))
+                    return true;
+            }
+        }
+        return false;
+    },
+
+    outputSlotValid:function(){return false;}
 }
+
+ModAPI.addAPICallback("RecipeViewer", function(api){
+	let RecipeViewer = api.Core;
+    
+    Object.keys(RecipeTEDev.mechanisms).forEach(function(wb_sid){
+        let mech = RecipeTEDev.mechanisms[wb_sid];
+        var screen = mech.rv_gui;
+        if(screen == null){
+            let elements = {};
+            let drawing = [];
+            let offset = RecipeTEDev.getOffsetWindow(mech);
+            let c = mech.gui.getContent();
+            for(let i = 0, l = mech.rows * mech.cols; i < l; i++){
+                let slot = c.elements[(typeof(mech.input) == "string")? mech.input + i : mech.input[i]];
+                
+                elements["input" + i] = {
+                        type: "slot",
+                        x: slot.x - offset.x,
+                        y: slot.y - offset.y,
+                        size: slot.size || 60
+                    }
+            }
+
+            let slot = c.elements[mech.output];
+            elements.output0 = {
+                    type: "slot",
+                    x: slot.x - offset.x,
+                    y: slot.y - offset.y,
+                    size: slot.size || 60
+            }
+            
+            for(let id in c.drawing){
+                let el = c.drawing[id];
+                if(!el.RV) continue;
+                let newEl = {};
+                Object.keys(el).forEach(function(param){
+                    if(param == "RV") return;
+                    newEl[param] = el[param];
+                });
+                newEl.x -= offset.x;
+                newEl.y -= offset.y;
+                drawing.push(newEl);
+            }
+            
+            for(let id in c.elements){
+                let el = c.elements[id];
+                if(!el.RV) continue;
+                let newEl = {};
+                Object.keys(el).forEach(function(param){
+                    if(param == "RV") return;
+                    newEl[param] = el[param];
+                });
+                newEl.x -= offset.x;
+                newEl.y -= offset.y;
+                elements[id] = newEl;
+            }
+            screen = {
+                drawing:drawing,
+                elements:elements
+            };
+        }
+
+        if(!screen.icon){
+            if(!BlockID[wb_sid]) return;
+            
+            screen.icon = BlockID[wb_sid];
+        }
+
+		RecipeViewer.registerRecipeType("rtel_"+wb_sid, {
+            contents:screen,
+            getList:function(id, data, isUsage){
+                let list = [];
+                RecipeTE.getRecipes(wb_sid).forEach(function(recipe){
+                    if(RecipeTEDev.checkRecipe(recipe, {id:id, data:data}, isUsage)){
+                        let result = recipe.result;
+                        let input = [];
+                        switch(recipe.type){
+                            case "grid":
+                                for(let row = 0; row < mech.rows; row++){
+                                    for(let col = 0; col < mech.cols; col++){
+                                        let ing = RecipeTE.AIR_ITEM;
+                                        let _r = recipe.recipe[row];
+
+                                        if(_r != undefined){
+                                            ing = recipe.ingridients[_r[col]];
+                                            if(ing == undefined || ing.id == undefined)
+                                                ing = RecipeTE.AIR_ITEM;
+                                        }  
+                                        
+                                        if(!ing.count)ing.count = 1;
+    
+                                        input.push(ing);
+                                    }
+                                }
+                             break;
+                            case "line":
+                                for(let  i = 0; i < recipe.recipe.length; i++){
+                                    let ing = recipe.ingridients[recipe.recipe[i]];
+
+                                    if(ing == undefined || ing.id == undefined)
+                                                ing = RecipeTE.AIR_ITEM;
+
+                                    if(!ing.count)ing.count = 1;
+                                    
+                                    input.push(ing);
+                                }
+                            break;
+                            case "not_shape":
+                                for(let id in recipe.ingridients){
+                                    if(!recipe.ingridients[id].count)recipe.ingridients[id].count = 1;
+                                    for(let i = 0; i < recipe.ingridients[id].count; i++)
+                                        input.push(recipe.ingridients[id]);
+                                }
+                            break;
+                            default: return;
+                        }
+                        list.push({
+                            input: input,
+                            output: [result]
+                        });
+                    }
+                });
+        
+                return list;
+            }
+        });
+    });
+});
 
 EXPORT("RecipeTE", RecipeTE);
