@@ -18,6 +18,10 @@
     ©WolfTeam ( https://vk.com/wolf___team )
 */
 /*  ChangeLog:
+	v1.4
+	- Дополнен перевод.
+	- Установка структуры производится в потоке, только если установка в режиме Structure.PROGRESSIVELY.
+	- Блоки воздуха в структуре больше не заменяются на камень
 	v1.3
 	- StructuresAPI удален.
 	- Добавлен объект Rotate. Используется для сложных поворотов.
@@ -32,10 +36,10 @@
 	- Исправлена установка блоков добавленных модом.
 	- Исправлено сохранение предметов и блоков.
 	- Исправлен поворот на 180 градусов по Y.
-	- Сохраняются TileEntity
+	- Сохраняются TileEntity.
 	v1.2
 	- Библиотека переписана. Объект StructuresAPI устарел.
-	- Сохраняется содержимое сундуков, печей и воронок
+	- Сохраняется содержимое сундуков, печей и воронок.
 	v1.1
 	- Добавлен метод StructuresAPI.init(string NameFolder) - Задает папку со структурами.
 	- Изменен метод StructuresAPI.set(name, x, y, z, rotate, destroy, progressively, time) - Добавлены параметры (Автор ToxesFoxes https://vk.com/tmm_corporation )
@@ -46,7 +50,7 @@
 
 LIBRARY({
     name: "StructuresAPI",
-    version: 5,
+    version: 6,
     shared: false,
     api: "CoreEngine"
 });
@@ -222,6 +226,78 @@ var Structure = function(name, alerted){
 	
 	this.check = this.get;
 	
+	function build(x,y,z, rotate, progressively, time){
+		for (var i = 0; i < structure.length; i++) {
+			var block = structure[i];
+			var id, data = 0;
+
+			if(typeof block[3] == "object"){
+				id = block[3].id;
+				data = block[3].data || data;
+			}else{
+				id = block[3];
+			}
+
+			switch(typeof id){
+				case "number":break;
+				case "string":
+					id = BlockID[block[3]] || 1;
+				break;
+				default:
+					id = 1;
+				break;
+			}
+			
+			var dx = block[0];
+			var dy = block[1];
+			var dz = block[2];
+			
+			for(var j = 0, l = rotate.length; j < l; j++){
+				let _dx = dx * rotate[j][0] + dy * rotate[j][1] + dz * rotate[j][2];
+				let _dy = dx * rotate[j][3] + dy * rotate[j][4] + dz * rotate[j][5];
+				let _dz = dx * rotate[j][6] + dy * rotate[j][7] + dz * rotate[j][8];
+				dx = _dx;
+				dy = _dy;
+				dz = _dz;
+			}
+			
+			World.setBlock(x + dx, y + dy, z + dz, id, data);
+			if(block[4]){
+				if([54, 61, 62, 154].indexOf(id) != -1){
+					let TE = World.getContainer(x + dx, y + dy, z + dz);
+
+					let chest = chests[block[4]];
+					for(let j = 0, l = chest.length; j < l; j++){
+						let item_id = chest[j][1].id;
+						
+						if(isNaN(parseInt(item_id)))
+							item_id = BlockID[item_id] || ItemID[item_id];
+						
+						TE.setSlot(chest[j][0], item_id, chest[j][1].count, chest[j][1].data || 0);
+					}
+				}else{
+					let te_storage = TileEntitys[block[4]];
+					let TE = World.addTileEntity(x + dx, y + dy, z + dz);
+					TE.data = te_storage.data;
+					
+					if(te_storage.slots){
+						for(let j in te_storage.slots){
+							let slot = te_storage.slots[j];
+							let item_id = slot.id;
+							
+							if(isNaN(parseInt(item_id)))
+								item_id = BlockID[item_id] || ItemID[item_id];
+							
+							TE.container.setSlot(j, item_id, slot.count, slot.data);
+						}
+					}
+				}
+			}
+
+			if(progressively)java.lang.Thread.sleep(time || 100);
+		}
+	}
+
 	this.set = function(x, y, z, rotate, progressively, time){
 		if (rotate === undefined) rotate = Structure.ROTATE_NONE;
 		if (progressively === undefined) progressively = Structure.NOT_PROGRESSIVELY;
@@ -235,69 +311,12 @@ var Structure = function(name, alerted){
 		else
 			rotate = [rotate];
 		
-		new java.lang.Thread(function () {
-			for (var i = 0; i < structure.length; i++) {
-				var block = structure[i];
-				var id, data = 0;
-
-				if(typeof block[3] == "number")
-					id = block[3];
-				else if(typeof block[3] == "string")
-					id = BlockID[block[3]];
-				else{
-					id = block[3].id || 1;
-					data = block[3].data;
-				}
-				
-				var dx = block[0];
-				var dy = block[1];
-				var dz = block[2];
-				
-				for(var j = 0, l = rotate.length; j < l; j++){
-					let _dx = dx * rotate[j][0] + dy * rotate[j][1] + dz * rotate[j][2];
-					let _dy = dx * rotate[j][3] + dy * rotate[j][4] + dz * rotate[j][5];
-					let _dz = dx * rotate[j][6] + dy * rotate[j][7] + dz * rotate[j][8];
-					dx = _dx;
-					dy = _dy;
-					dz = _dz;
-				}
-				
-				World.setBlock(x + dx, y + dy, z + dz, id, data);
-				if(block[4]){
-					if([54, 61, 62, 154].indexOf(id) != -1){
-						let TE = World.getContainer(x + dx, y + dy, z + dz);
-
-						let chest = chests[block[4]];
-						for(let j = 0, l = chest.length; j < l; j++){
-							let item_id = chest[j][1].id;
-							
-							if(isNaN(parseInt(item_id)))
-								item_id = BlockID[item_id] || ItemID[item_id];
-							
-							TE.setSlot(chest[j][0], item_id, chest[j][1].count, chest[j][1].data || 0);
-						}
-					}else{
-						let te_storage = TileEntitys[block[4]];
-						let TE = World.addTileEntity(x + dx, y + dy, z + dz);
-						TE.data = te_storage.data;
-						
-						if(te_storage.slots){
-							for(let j in te_storage.slots){
-								let slot = te_storage.slots[j];
-								let item_id = slot.id;
-								
-								if(isNaN(parseInt(item_id)))
-									item_id = BlockID[item_id] || ItemID[item_id];
-								
-								TE.container.setSlot(j, item_id, slot.count, slot.data);
-							}
-						}
-					}
-				}
-
-				if(progressively)java.lang.Thread.sleep(time || 100);
-			}
-		}).start();
+		if(progressively)
+			new java.lang.Thread(function () {
+				build(x,y,z, rotate, progressively, time);
+			}).start();
+		else
+			build(x,y,z,rotate, false);
 	}
 	
 	this.destroy = function(x,y,z, rotates, progressively, time){
@@ -362,7 +381,7 @@ var Structure = function(name, alerted){
 						if(read.chests) chests = read.chests;
 					break;
 					default:
-						Translation.sprintf("Unknown version \"%s\".", read.version);
+						alert(Translation.sprintf("Unknown version \"%s\".", read.version));
 					break;
 				}
 			}else{
@@ -520,11 +539,11 @@ Structure.get = function(name, alerted) {
 	else
 		return new Structure(name, alerted);
 }
-Structure.init = function(dir){
-	if(typeof dir != "string" && !(dir instanceof java.lang.String))
-		throw "dir is not string.";
+Structure.init = function(folderName){
+	if(typeof folderName != "string" && !(folderName instanceof java.lang.String))
+		throw "folderName is not string.";
 		
-	StructuresDB.dir = dir;
+	StructuresDB.folderName = folderName;
 }
 Structure.setInWorld = function(name, x, y, z, rotate, progressively, time){
 	Structure.get(name).set(x, y, z, rotate, progressively, time);
@@ -554,7 +573,7 @@ if(JSON.parse(FileTools.ReadText(__dir__+"build.config")).defaultConfig.buildTyp
 		Callback.addCallback("ItemUse", function(c,i){
 			if(i.id == 268){
 				g_center = c;
-				Game.message("Центр установлен.");
+				Game.message(Translation.translate("The zero point of the structure is set."));
 			}
 			if(i.id == 271){
 				g_center = null;
@@ -627,6 +646,10 @@ Translation.addTranslation("Structure \"%s\" not found.",{
 Translation.addTranslation("Unknown version \"%s\".", {
 	ru:"Неизвестная версия \"%s\".",
 	en:"Unknown version \"%s\".",
+});
+Translation.addTranslation("The zero point of the structure is set.", {
+	ru:"Нулевая точка структуры установлена.",
+	en:"The zero point of the structure is set.",
 });
 
 if(!Translation.sprintf){
